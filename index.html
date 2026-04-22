@@ -8,23 +8,54 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
 
+<style>
+.hero-bg { background-color:#0d47a1; }
+.btn-primary { background:#f97316;color:white;padding:10px;border-radius:6px; }
+.card { background:white;border-radius:10px;box-shadow:0 4px 6px rgba(0,0,0,0.1); }
+</style>
 </head>
 
-<body class="bg-gray-100">
+<body class="bg-gray-50">
 
-<!-- 🔐 AUTH -->
-<div class="p-4 bg-white shadow flex gap-2">
-  <input id="email" placeholder="Email" class="border p-2">
-  <input id="password" type="password" placeholder="Password" class="border p-2">
-  <button onclick="signup()" class="bg-blue-500 text-white px-3 py-2">Sign Up</button>
-  <button onclick="login()" class="bg-green-500 text-white px-3 py-2">Login</button>
-  <button onclick="logout()" class="bg-red-500 text-white px-3 py-2">Logout</button>
+<!-- 🔐 LOGIN / SIGNUP -->
+<div id="auth-page" class="flex items-center justify-center h-screen bg-gray-100">
+  <div class="bg-white p-6 rounded shadow w-80">
+    <h2 class="text-xl font-bold mb-4 text-center">Login / Signup</h2>
+
+    <input id="email" placeholder="Email" class="border p-2 w-full mb-2">
+    <input id="password" type="password" placeholder="Password" class="border p-2 w-full mb-3">
+
+    <button onclick="signup()" class="bg-blue-500 text-white w-full p-2 mb-2">Sign Up</button>
+    <button onclick="login()" class="bg-green-500 text-white w-full p-2">Login</button>
+  </div>
 </div>
 
-<!-- 🚗 AUCTIONS -->
-<div class="p-6">
-  <h1 class="text-2xl font-bold mb-4">Live Auctions</h1>
-  <div id="auction-list" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+<!-- 🌐 MAIN WEBSITE (YOUR UI) -->
+<div id="main-site" style="display:none;">
+
+<header class="bg-white shadow p-4 flex justify-between">
+  <h1 class="text-xl font-bold text-blue-800">LOGO</h1>
+  <button onclick="logout()" class="bg-red-500 text-white px-3 py-1 rounded">Logout</button>
+</header>
+
+<section class="hero-bg text-white p-10 text-center">
+  <h1 class="text-4xl font-bold">Flood Damaged Vehicles</h1>
+  <p class="text-xl">Cars priced to excite</p>
+</section>
+
+<section class="p-6">
+  <h2 class="text-2xl font-bold text-center mb-4">Latest Auction</h2>
+  <div id="auction-container" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+</section>
+
+<section class="p-6 bg-white">
+  <h2 class="text-xl font-bold text-center mb-4">Newsletter</h2>
+  <form onsubmit="subscribe(event)" class="flex justify-center">
+    <input name="email" placeholder="Enter email" class="border p-2">
+    <button class="btn-primary ml-2">Subscribe</button>
+  </form>
+</section>
+
 </div>
 
 <script>
@@ -33,112 +64,107 @@ const SUPABASE_KEY = "sb_publishable_WG4B4X3dmk2K51Jhtuwo1g_71N9dDpU";
 
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// 🔐 AUTH FUNCTIONS
-async function signup() {
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
+// AUTH
+async function signup(){
+  const email = emailInput();
+  const password = passwordInput();
 
   const { error } = await supabaseClient.auth.signUp({ email, password });
-
-  alert(error ? error.message : "Signup successful!");
+  alert(error ? error.message : "Signup success");
 }
 
-async function login() {
-  const email = document.getElementById("email").value;
-  const password = document.getElementById("password").value;
+async function login(){
+  const email = emailInput();
+  const password = passwordInput();
 
   const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
 
-  alert(error ? error.message : "Login successful!");
+  if(!error){
+    showMain();
+  } else alert(error.message);
 }
 
-async function logout() {
+async function logout(){
   await supabaseClient.auth.signOut();
-  alert("Logged out");
+  location.reload();
 }
 
-// 📦 LOAD AUCTIONS
-async function loadAuctions() {
-  const { data, error } = await supabaseClient.from("auctions").select("*");
+function emailInput(){ return document.getElementById("email").value; }
+function passwordInput(){ return document.getElementById("password").value; }
 
-  const container = document.getElementById("auction-list");
-  container.innerHTML = "";
+// SHOW UI
+function showMain(){
+  document.getElementById("auth-page").style.display="none";
+  document.getElementById("main-site").style.display="block";
+  loadAuctions();
+}
 
-  if (error) {
-    container.innerHTML = "Error loading auctions";
-    return;
-  }
+// LOAD AUCTIONS
+async function loadAuctions(){
+  const { data } = await supabaseClient.from("auctions").select("*");
 
-  data.forEach(a => {
+  const container = document.getElementById("auction-container");
+  container.innerHTML="";
+
+  data.forEach(a=>{
     const card = document.createElement("div");
-    card.className = "bg-white p-4 shadow rounded";
+    card.className="card p-4";
 
-    card.innerHTML = `
+    card.innerHTML=`
       <img src="${a.image_url || 'https://via.placeholder.com/300'}" class="w-full h-40 object-cover mb-2">
-      <h2 class="font-bold">${a.title}</h2>
-      <p class="mb-2">Current Price: ₹${a.current_price}</p>
+      <h3 class="font-bold">${a.title}</h3>
+      <p>₹${a.current_price}</p>
 
-      <input type="number" id="bid-${a.id}" class="border p-2 w-full" placeholder="Enter bid">
-      <button onclick="placeBid('${a.id}')" class="bg-blue-600 text-white px-2 py-2 mt-2 w-full">
-        Place Bid
-      </button>
+      <input type="number" id="bid-${a.id}" class="border p-1 w-full mt-2">
+      <button onclick="placeBid('${a.id}')" class="btn-primary w-full mt-2">Bid</button>
     `;
 
     container.appendChild(card);
   });
 }
 
-// 💰 PLACE BID
-async function placeBid(id) {
+// BID
+async function placeBid(id){
   const amount = document.getElementById(`bid-${id}`).value;
-
   const user = await supabaseClient.auth.getUser();
 
-  if (!user.data.user) {
-    alert("Please login first!");
+  if(!user.data.user){
+    alert("Login first");
     return;
   }
 
-  if (!amount) {
-    alert("Enter bid amount");
-    return;
-  }
+  await supabaseClient.from("bids").insert([{
+    auction_id:id,
+    user_id:user.data.user.id,
+    amount
+  }]);
 
-  await supabaseClient.from("bids").insert([
-    {
-      auction_id: id,
-      user_id: user.data.user.id,
-      amount: amount
-    }
-  ]);
+  await supabaseClient.from("auctions")
+    .update({ current_price:amount })
+    .eq("id",id);
 
-  await supabaseClient
-    .from("auctions")
-    .update({ current_price: amount })
-    .eq("id", id);
-
-  alert("Bid placed!");
   loadAuctions();
 }
 
-// 🔴 REALTIME UPDATES
-function realtime() {
-  supabaseClient
-    .channel("bids")
-    .on("postgres_changes", {
-      event: "INSERT",
-      schema: "public",
-      table: "bids"
-    }, payload => {
-      console.log("New bid:", payload);
-      loadAuctions();
-    })
-    .subscribe();
+// NEWSLETTER
+async function subscribe(e){
+  e.preventDefault();
+  const email = e.target.email.value;
+
+  await supabaseClient.from("newsletter").insert([{ email }]);
+  alert("Subscribed!");
 }
 
-// 🚀 INIT
-loadAuctions();
-realtime();
+// AUTO LOGIN CHECK
+supabaseClient.auth.getSession().then(({data})=>{
+  if(data.session) showMain();
+});
+
+// REALTIME
+supabaseClient.channel("bids")
+.on("postgres_changes",{event:"INSERT",schema:"public",table:"bids"},
+()=>loadAuctions())
+.subscribe();
 
 </script>
 
